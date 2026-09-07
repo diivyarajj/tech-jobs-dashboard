@@ -1,5 +1,5 @@
-<!-- v2 -->
- <!DOCTYPE html>
+<!-- v3 -->
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -82,6 +82,7 @@
 
         .btn-primary { background: var(--primary-color); color: white; font-weight: 600; cursor: pointer; border: none; }
         .btn-theme { cursor: pointer; font-weight: 600; }
+        .btn-secondary { background: var(--card-bg); color: var(--text-main); cursor: pointer; font-weight: 600; }
 
         .charts-grid {
             display: grid;
@@ -98,9 +99,12 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
-        table { width: 100%; border-collapse: collapse; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
         th, td { padding: 12px 16px; border-bottom: 1px solid var(--border-color); text-align: left; font-size: 14px; }
         th { background: var(--bg-color); color: var(--text-sub); font-weight: 600; }
+
+        .pagination { display: flex; justify-content: space-between; align-items: center; }
+        .pagination-buttons { display: flex; gap: 10px; }
     </style>
 </head>
 <body>
@@ -133,8 +137,17 @@
 
     <div class="controls">
         <input type="text" id="searchInput" placeholder="🔍 Search job titles..." onkeyup="filterData()">
+        
+        <select id="roleSelect" onchange="filterData()">
+            <option value="">All Job Roles</option>
+        </select>
+
         <select id="locationSelect" onchange="filterData()">
             <option value="">All Locations</option>
+        </select>
+
+        <select id="salarySelect" onchange="filterData()">
+            <option value="">All Salary Brackets</option>
         </select>
     </div>
 
@@ -165,10 +178,20 @@
             </thead>
             <tbody></tbody>
         </table>
+        
+        <div class="pagination">
+            <span id="pageIndicator" style="font-size: 14px; color: var(--text-sub);">Page 1 of 1</span>
+            <div class="pagination-buttons">
+                <button class="btn-secondary" id="prevBtn" onclick="changePage(-1)">Previous</button>
+                <button class="btn-secondary" id="nextBtn" onclick="changePage(1)">Next</button>
+            </div>
+        </div>
     </div>
 
     <script>
         let allJobs = [], filteredJobs = [];
+        let currentPage = 1;
+        const rowsPerPage = 10;
         let barChartInstance = null, pieChartInstance = null, salaryChartInstance = null;
 
         async function initDashboard() {
@@ -176,7 +199,7 @@
             allJobs = await res.json();
             filteredJobs = [...allJobs];
 
-            populateLocations();
+            populateDropdowns();
             updateKPIs();
             renderCharts();
             renderTable();
@@ -187,14 +210,19 @@
             document.body.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
         }
 
-        function populateLocations() {
+        function populateDropdowns() {
+            const roles = [...new Set(allJobs.map(j => j.JobTitle))].sort();
             const locations = [...new Set(allJobs.map(j => j.Location))].sort();
-            const select = document.getElementById('locationSelect');
-            locations.forEach(loc => {
-                const opt = document.createElement('option');
-                opt.value = loc; opt.innerText = loc;
-                select.appendChild(opt);
-            });
+            const salaries = [...new Set(allJobs.map(j => j.Salary))].sort();
+
+            const roleSelect = document.getElementById('roleSelect');
+            roles.forEach(r => roleSelect.add(new Option(r, r)));
+
+            const locSelect = document.getElementById('locationSelect');
+            locations.forEach(l => locSelect.add(new Option(l, l)));
+
+            const salSelect = document.getElementById('salarySelect');
+            salaries.forEach(s => salSelect.add(new Option(s, s)));
         }
 
         function updateKPIs() {
@@ -204,8 +232,8 @@
                 roles[j.JobTitle] = (roles[j.JobTitle] || 0) + 1;
                 locations[j.Location] = (locations[j.Location] || 0) + 1;
             });
-            document.getElementById('kpiTopRole').innerText = Object.keys(roles).reduce((a, b) => roles[a] > roles[b] ? a : b, 'N/A');
-            document.getElementById('kpiTopLocation').innerText = Object.keys(locations).reduce((a, b) => locations[a] > locations[b] ? a : b, 'N/A');
+            document.getElementById('kpiTopRole').innerText = Object.keys(roles).length ? Object.keys(roles).reduce((a, b) => roles[a] > roles[b] ? a : b) : 'N/A';
+            document.getElementById('kpiTopLocation').innerText = Object.keys(locations).length ? Object.keys(locations).reduce((a, b) => locations[a] > locations[b] ? a : b) : 'N/A';
         }
 
         function renderCharts() {
@@ -217,7 +245,6 @@
                 salaryCounts[j.Salary] = (salaryCounts[j.Salary] || 0) + 1;
             });
 
-            // Bar Chart
             if (barChartInstance) barChartInstance.destroy();
             barChartInstance = new Chart(document.getElementById('barChart'), {
                 type: 'bar',
@@ -228,7 +255,6 @@
                 options: { responsive: true, plugins: { legend: { display: false } } }
             });
 
-            // Salary Distribution Chart
             if (salaryChartInstance) salaryChartInstance.destroy();
             salaryChartInstance = new Chart(document.getElementById('salaryChart'), {
                 type: 'bar',
@@ -239,7 +265,6 @@
                 options: { responsive: true, plugins: { legend: { display: false } } }
             });
 
-            // Doughnut Chart
             if (pieChartInstance) pieChartInstance.destroy();
             const topLocations = Object.entries(locCounts).sort((a,b) => b[1] - a[1]).slice(0, 5);
             pieChartInstance = new Chart(document.getElementById('pieChart'), {
@@ -255,24 +280,48 @@
         function renderTable() {
             const tbody = document.querySelector('#jobsTable tbody');
             tbody.innerHTML = '';
-            filteredJobs.slice(0, 15).forEach(job => {
+
+            const start = (currentPage - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+            const pageData = filteredJobs.slice(start, end);
+
+            pageData.forEach(job => {
                 tbody.innerHTML += `<tr>
                     <td><strong>${job.JobTitle}</strong></td>
                     <td>${job.Location}</td>
                     <td>${job.Salary}</td>
                 </tr>`;
             });
+
+            const totalPages = Math.ceil(filteredJobs.length / rowsPerPage) || 1;
+            document.getElementById('pageIndicator').innerText = `Page ${currentPage} of ${totalPages}`;
+            document.getElementById('prevBtn').disabled = currentPage === 1;
+            document.getElementById('nextBtn').disabled = currentPage === totalPages;
+        }
+
+        function changePage(direction) {
+            currentPage += direction;
+            renderTable();
         }
 
         function filterData() {
             const searchVal = document.getElementById('searchInput').value.toLowerCase();
+            const roleVal = document.getElementById('roleSelect').value;
             const locVal = document.getElementById('locationSelect').value;
+            const salVal = document.getElementById('salarySelect').value;
 
             filteredJobs = allJobs.filter(j => {
-                return j.JobTitle.toLowerCase().includes(searchVal) && (locVal === '' || j.Location === locVal);
+                const matchSearch = j.JobTitle.toLowerCase().includes(searchVal);
+                const matchRole = roleVal === '' || j.JobTitle === roleVal;
+                const matchLoc = locVal === '' || j.Location === locVal;
+                const matchSal = salVal === '' || j.Salary === salVal;
+                return matchSearch && matchRole && matchLoc && matchSal;
             });
 
-            updateKPIs(); renderCharts(); renderTable();
+            currentPage = 1;
+            updateKPIs(); 
+            renderCharts(); 
+            renderTable();
         }
 
         function exportCSV() {
