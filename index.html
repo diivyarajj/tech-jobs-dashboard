@@ -237,45 +237,72 @@
         }
 
         function renderCharts() {
-            const roleCounts = {}, locCounts = {}, salaryCounts = {};
+    const roleCounts = {}, locCounts = {}, salaryCounts = {};
 
-            filteredJobs.forEach(j => {
-                roleCounts[j.JobTitle] = (roleCounts[j.JobTitle] || 0) + 1;
-                locCounts[j.Location] = (locCounts[j.Location] || 0) + 1;
-                salaryCounts[j.Salary] = (salaryCounts[j.Salary] || 0) + 1;
-            });
+    filteredJobs.forEach(j => {
+        roleCounts[j.JobTitle] = (roleCounts[j.JobTitle] || 0) + 1;
+        locCounts[j.Location] = (locCounts[j.Location] || 0) + 1;
+        salaryCounts[j.Salary] = (salaryCounts[j.Salary] || 0) + 1;
+    });
 
-            if (barChartInstance) barChartInstance.destroy();
-            barChartInstance = new Chart(document.getElementById('barChart'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(roleCounts).slice(0, 6),
-                    datasets: [{ label: 'Postings', data: Object.values(roleCounts).slice(0, 6), backgroundColor: '#2563eb', borderRadius: 6 }]
-                },
-                options: { responsive: true, plugins: { legend: { display: false } } }
-            });
-
-            if (salaryChartInstance) salaryChartInstance.destroy();
-            salaryChartInstance = new Chart(document.getElementById('salaryChart'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(salaryCounts).slice(0, 6),
-                    datasets: [{ label: 'Count', data: Object.values(salaryCounts).slice(0, 6), backgroundColor: '#10b981', borderRadius: 6 }]
-                },
-                options: { responsive: true, plugins: { legend: { display: false } } }
-            });
-
-            if (pieChartInstance) pieChartInstance.destroy();
-            const topLocations = Object.entries(locCounts).sort((a,b) => b[1] - a[1]).slice(0, 5);
-            pieChartInstance = new Chart(document.getElementById('pieChart'), {
-                type: 'doughnut',
-                data: {
-                    labels: topLocations.map(l => l[0]),
-                    datasets: [{ data: topLocations.map(l => l[1]), backgroundColor: ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#cbd5e1'] }]
-                },
-                options: { responsive: true }
-            });
+    // 1. Job Titles Bar Chart (Clean Rotated Labels)
+    if (barChartInstance) barChartInstance.destroy();
+    barChartInstance = new Chart(document.getElementById('barChart'), {
+        type: 'bar',
+        data: {
+            labels: Object.keys(roleCounts).slice(0, 6),
+            datasets: [{ label: 'Postings', data: Object.values(roleCounts).slice(0, 6), backgroundColor: '#2563eb', borderRadius: 6 }]
+        },
+        options: { 
+            responsive: true, 
+            plugins: { legend: { display: false } },
+            scales: {
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 30,
+                        font: { size: 11 }
+                    }
+                }
+            }
         }
+    });
+
+    // 2. Salary Distribution Chart (Fixed Overlapping Labels)
+    if (salaryChartInstance) salaryChartInstance.destroy();
+    salaryChartInstance = new Chart(document.getElementById('salaryChart'), {
+        type: 'bar',
+        data: {
+            labels: Object.keys(salaryCounts).slice(0, 6),
+            datasets: [{ label: 'Count', data: Object.values(salaryCounts).slice(0, 6), backgroundColor: '#10b981', borderRadius: 6 }]
+        },
+        options: { 
+            responsive: true, 
+            plugins: { legend: { display: false } },
+            scales: {
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 30,
+                        font: { size: 10 }
+                    }
+                }
+            }
+        }
+    });
+
+    // 3. Doughnut Chart
+    if (pieChartInstance) pieChartInstance.destroy();
+    const topLocations = Object.entries(locCounts).sort((a,b) => b[1] - a[1]).slice(0, 5);
+    pieChartInstance = new Chart(document.getElementById('pieChart'), {
+        type: 'doughnut',
+        data: {
+            labels: topLocations.map(l => l[0]),
+            datasets: [{ data: topLocations.map(l => l[1]), backgroundColor: ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#cbd5e1'] }]
+        },
+        options: { responsive: true }
+    });
+}
 
         function renderTable() {
             const tbody = document.querySelector('#jobsTable tbody');
