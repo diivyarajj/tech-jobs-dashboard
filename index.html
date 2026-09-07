@@ -171,7 +171,7 @@
         let barChartInstance = null, pieChartInstance = null, salaryChartInstance = null;
 
         async function initDashboard() {
-            const res = await fetch('http://127.0.0.1:8000/api/jobs');
+            const res = await fetch('https://tech-jobs-dashboard.onrender.com/api/jobs');
             allJobs = await res.json();
             filteredJobs = [...allJobs];
 
