@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tech Jobs & Skill Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-sub: #64748b;
+            --border-color: #e2e8f0;
+            --primary-color: #2563eb;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+            --border-color: #334155;
+            --primary-color: #3b82f6;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 30px;
+            transition: all 0.3s ease;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        h1 { font-size: 26px; font-weight: 700; margin: 0; }
+        p.subtitle { color: var(--text-sub); margin-top: 4px; font-size: 14px; }
+
+        .header-actions { display: flex; gap: 10px; }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .kpi-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .kpi-card h4 { margin: 0; color: var(--text-sub); font-size: 13px; text-transform: uppercase; }
+        .kpi-card .value { font-size: 24px; font-weight: 700; color: var(--primary-color); margin-top: 8px; }
+
+        .controls { display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; }
+
+        input, select, button {
+            padding: 12px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            background: var(--card-bg);
+            color: var(--text-main);
+        }
+
+        input { flex: 2; min-width: 200px; }
+        select { flex: 1; min-width: 150px; }
+
+        .btn-primary { background: var(--primary-color); color: white; font-weight: 600; cursor: pointer; border: none; }
+        .btn-theme { cursor: pointer; font-weight: 600; }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 22px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 16px; border-bottom: 1px solid var(--border-color); text-align: left; font-size: 14px; }
+        th { background: var(--bg-color); color: var(--text-sub); font-weight: 600; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <h1>Tech Jobs & Skill Analytics Dashboard</h1>
+            <p class="subtitle">Real-time global market trends & compensation insights</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn-theme" onclick="toggleTheme()">🌓 Theme</button>
+            <button class="btn-primary" onclick="exportCSV()">Download CSV</button>
+        </div>
+    </div>
+
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <h4>Total Postings Loaded</h4>
+            <div class="value" id="kpiTotalJobs">0</div>
+        </div>
+        <div class="kpi-card">
+            <h4>Top Job Role</h4>
+            <div class="value" id="kpiTopRole">-</div>
+        </div>
+        <div class="kpi-card">
+            <h4>Top Location</h4>
+            <div class="value" id="kpiTopLocation">-</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="searchInput" placeholder="🔍 Search job titles..." onkeyup="filterData()">
+        <select id="locationSelect" onchange="filterData()">
+            <option value="">All Locations</option>
+        </select>
+    </div>
+
+    <div class="charts-grid">
+        <div class="card">
+            <h3>Job Titles Distribution</h3>
+            <canvas id="barChart"></canvas>
+        </div>
+        <div class="card">
+            <h3>Salary Brackets Distribution</h3>
+            <canvas id="salaryChart"></canvas>
+        </div>
+        <div class="card">
+            <h3>Top Locations Share</h3>
+            <canvas id="pieChart"></canvas>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Live Job Listings</h3>
+        <table id="jobsTable">
+            <thead>
+                <tr>
+                    <th>Job Title</th>
+                    <th>Location</th>
+                    <th>Salary Range ($)</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        let allJobs = [], filteredJobs = [];
+        let barChartInstance = null, pieChartInstance = null, salaryChartInstance = null;
+
+        async function initDashboard() {
+            const res = await fetch('http://127.0.0.1:8000/api/jobs');
+            allJobs = await res.json();
+            filteredJobs = [...allJobs];
+
+            populateLocations();
+            updateKPIs();
+            renderCharts();
+            renderTable();
+        }
+
+        function toggleTheme() {
+            const current = document.body.getAttribute('data-theme');
+            document.body.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+        }
+
+        function populateLocations() {
+            const locations = [...new Set(allJobs.map(j => j.Location))].sort();
+            const select = document.getElementById('locationSelect');
+            locations.forEach(loc => {
+                const opt = document.createElement('option');
+                opt.value = loc; opt.innerText = loc;
+                select.appendChild(opt);
+            });
+        }
+
+        function updateKPIs() {
+            document.getElementById('kpiTotalJobs').innerText = filteredJobs.length;
+            const roles = {}, locations = {};
+            filteredJobs.forEach(j => {
+                roles[j.JobTitle] = (roles[j.JobTitle] || 0) + 1;
+                locations[j.Location] = (locations[j.Location] || 0) + 1;
+            });
+            document.getElementById('kpiTopRole').innerText = Object.keys(roles).reduce((a, b) => roles[a] > roles[b] ? a : b, 'N/A');
+            document.getElementById('kpiTopLocation').innerText = Object.keys(locations).reduce((a, b) => locations[a] > locations[b] ? a : b, 'N/A');
+        }
+
+        function renderCharts() {
+            const roleCounts = {}, locCounts = {}, salaryCounts = {};
+
+            filteredJobs.forEach(j => {
+                roleCounts[j.JobTitle] = (roleCounts[j.JobTitle] || 0) + 1;
+                locCounts[j.Location] = (locCounts[j.Location] || 0) + 1;
+                salaryCounts[j.Salary] = (salaryCounts[j.Salary] || 0) + 1;
+            });
+
+            // Bar Chart
+            if (barChartInstance) barChartInstance.destroy();
+            barChartInstance = new Chart(document.getElementById('barChart'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(roleCounts).slice(0, 6),
+                    datasets: [{ label: 'Postings', data: Object.values(roleCounts).slice(0, 6), backgroundColor: '#2563eb', borderRadius: 6 }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+
+            // Salary Distribution Chart
+            if (salaryChartInstance) salaryChartInstance.destroy();
+            salaryChartInstance = new Chart(document.getElementById('salaryChart'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(salaryCounts).slice(0, 6),
+                    datasets: [{ label: 'Count', data: Object.values(salaryCounts).slice(0, 6), backgroundColor: '#10b981', borderRadius: 6 }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+
+            // Doughnut Chart
+            if (pieChartInstance) pieChartInstance.destroy();
+            const topLocations = Object.entries(locCounts).sort((a,b) => b[1] - a[1]).slice(0, 5);
+            pieChartInstance = new Chart(document.getElementById('pieChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: topLocations.map(l => l[0]),
+                    datasets: [{ data: topLocations.map(l => l[1]), backgroundColor: ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#cbd5e1'] }]
+                },
+                options: { responsive: true }
+            });
+        }
+
+        function renderTable() {
+            const tbody = document.querySelector('#jobsTable tbody');
+            tbody.innerHTML = '';
+            filteredJobs.slice(0, 15).forEach(job => {
+                tbody.innerHTML += `<tr>
+                    <td><strong>${job.JobTitle}</strong></td>
+                    <td>${job.Location}</td>
+                    <td>${job.Salary}</td>
+                </tr>`;
+            });
+        }
+
+        function filterData() {
+            const searchVal = document.getElementById('searchInput').value.toLowerCase();
+            const locVal = document.getElementById('locationSelect').value;
+
+            filteredJobs = allJobs.filter(j => {
+                return j.JobTitle.toLowerCase().includes(searchVal) && (locVal === '' || j.Location === locVal);
+            });
+
+            updateKPIs(); renderCharts(); renderTable();
+        }
+
+        function exportCSV() {
+            let csv = "Job Title,Location,Salary\n";
+            filteredJobs.forEach(r => csv += `"${r.JobTitle}","${r.Location}","${r.Salary}"\n`);
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'filtered_job_data.csv';
+            a.click();
+        }
+
+        initDashboard();
+    </script>
+</body>
+</html>
