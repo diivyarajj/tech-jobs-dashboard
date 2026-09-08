@@ -1,4 +1,4 @@
-<!-- v4 - Ultra Polished Dashboard -->
+<!-- v5 - Next-Level Polished & Bug-Free Dashboard -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -172,6 +172,19 @@
         /* Pagination Controls */
         .pagination { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
         .pagination-buttons { display: flex; gap: 10px; }
+
+        /* Next-Level Mobile Optimization */
+        @media (max-width: 768px) {
+            body { padding: 16px 12px; }
+            .header { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .header-actions { width: 100%; display: flex; justify-content: space-between; }
+            .header-actions button { flex: 1; }
+            .kpi-grid { grid-template-columns: 1fr; gap: 12px; }
+            .controls { grid-template-columns: 1fr; }
+            .charts-grid { grid-template-columns: 1fr; }
+            .card { padding: 16px; }
+            h1 { font-size: 22px; }
+        }
     </style>
 </head>
 <body>
@@ -289,23 +302,25 @@
             localStorage.setItem('theme_pref', nextTheme);
         }
 
-        // Restore saved theme on startup
         if (localStorage.getItem('theme_pref') === 'dark') {
             document.body.setAttribute('data-theme', 'dark');
         }
 
         function populateDropdowns() {
-            const roles = [...new Set(allJobs.map(j => j.JobTitle))].sort();
-            const locations = [...new Set(allJobs.map(j => j.Location))].sort();
-            const salaries = [...new Set(allJobs.map(j => j.Salary))].sort();
+            const roles = [...new Set(allJobs.map(j => String(j.JobTitle).trim()))].sort();
+            const locations = [...new Set(allJobs.map(j => String(j.Location).trim()))].sort();
+            const salaries = [...new Set(allJobs.map(j => String(j.Salary).trim()))].sort();
 
             const roleSelect = document.getElementById('roleSelect');
+            roleSelect.innerHTML = '<option value="">All Roles</option>';
             roles.forEach(r => roleSelect.add(new Option(r, r)));
 
             const locSelect = document.getElementById('locationSelect');
+            locSelect.innerHTML = '<option value="">All Locations</option>';
             locations.forEach(l => locSelect.add(new Option(l, l)));
 
             const salSelect = document.getElementById('salarySelect');
+            salSelect.innerHTML = '<option value="">All Salary Brackets</option>';
             salaries.forEach(s => salSelect.add(new Option(s, s)));
         }
 
@@ -313,8 +328,10 @@
             document.getElementById('kpiTotalJobs').innerText = filteredJobs.length;
             const roles = {}, locations = {};
             filteredJobs.forEach(j => {
-                roles[j.JobTitle] = (roles[j.JobTitle] || 0) + 1;
-                locations[j.Location] = (locations[j.Location] || 0) + 1;
+                const title = String(j.JobTitle).trim();
+                const loc = String(j.Location).trim();
+                roles[title] = (roles[title] || 0) + 1;
+                locations[loc] = (locations[loc] || 0) + 1;
             });
 
             document.getElementById('kpiTopRole').innerText = Object.keys(roles).length 
@@ -330,9 +347,13 @@
             const roleCounts = {}, locCounts = {}, salaryCounts = {};
 
             filteredJobs.forEach(j => {
-                roleCounts[j.JobTitle] = (roleCounts[j.JobTitle] || 0) + 1;
-                locCounts[j.Location] = (locCounts[j.Location] || 0) + 1;
-                salaryCounts[j.Salary] = (salaryCounts[j.Salary] || 0) + 1;
+                const title = String(j.JobTitle).trim();
+                const loc = String(j.Location).trim();
+                const sal = String(j.Salary).trim();
+
+                roleCounts[title] = (roleCounts[title] || 0) + 1;
+                locCounts[loc] = (locCounts[loc] || 0) + 1;
+                salaryCounts[sal] = (salaryCounts[sal] || 0) + 1;
             });
 
             // 1. Job Titles Bar Chart
@@ -401,13 +422,17 @@
             const end = start + rowsPerPage;
             const pageData = filteredJobs.slice(start, end);
 
-            pageData.forEach(job => {
-                tbody.innerHTML += `<tr>
-                    <td><strong>${job.JobTitle}</strong></td>
-                    <td>${job.Location}</td>
-                    <td>${job.Salary}</td>
-                </tr>`;
-            });
+            if (pageData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--text-sub);">No matching job postings found.</td></tr>`;
+            } else {
+                pageData.forEach(job => {
+                    tbody.innerHTML += `<tr>
+                        <td><strong>${job.JobTitle}</strong></td>
+                        <td>${job.Location}</td>
+                        <td>${job.Salary}</td>
+                    </tr>`;
+                });
+            }
 
             const totalPages = Math.ceil(filteredJobs.length / rowsPerPage) || 1;
             document.getElementById('pageIndicator').innerText = `Page ${currentPage} of ${totalPages}`;
@@ -421,16 +446,18 @@
         }
 
         function filterData() {
-            const searchVal = document.getElementById('searchInput').value.toLowerCase();
-            const roleVal = document.getElementById('roleSelect').value;
-            const locVal = document.getElementById('locationSelect').value;
-            const salVal = document.getElementById('salarySelect').value;
+            const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
+            const roleVal = document.getElementById('roleSelect').value.trim();
+            const locVal = document.getElementById('locationSelect').value.trim();
+            const salVal = document.getElementById('salarySelect').value.trim();
 
             filteredJobs = allJobs.filter(j => {
-                const matchSearch = j.JobTitle.toLowerCase().includes(searchVal);
-                const matchRole = roleVal === '' || j.JobTitle === roleVal;
-                const matchLoc = locVal === '' || j.Location === locVal;
-                const matchSal = salVal === '' || j.Salary === salVal;
+                const title = String(j.JobTitle || "").toLowerCase();
+                const matchSearch = searchVal === "" || title.includes(searchVal);
+                const matchRole = roleVal === "" || String(j.JobTitle).trim() === roleVal;
+                const matchLoc = locVal === "" || String(j.Location).trim() === locVal;
+                const matchSal = salVal === "" || String(j.Salary).trim() === salVal;
+
                 return matchSearch && matchRole && matchLoc && matchSal;
             });
 
